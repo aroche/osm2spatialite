@@ -198,7 +198,7 @@ class DBStyle:
     def is_polygon(self, tags):
         """Checks if any of the given tags if flagged as polygon"""
         for tagname in tags:
-            if tagname in self.tags and self.tags[tagname]['flag'] == 'polygon':
+            if tagname in self.tags and self.tags[tagname]['flag'] in ('polygon', 'phstore'):
                 return True
 
 
