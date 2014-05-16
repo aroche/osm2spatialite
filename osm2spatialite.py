@@ -24,7 +24,7 @@
 
 # imports OSM data into a SqLite database, with more elements than the default sqlite_osm_*
 # uses a style file like osm2pgsql
-# options (to implement) : stylefile, add other tags, srid, keep raw tables, add geometry indices
+
 
 import os, sys
 import pyspatialite.dbapi2 as db
@@ -44,12 +44,11 @@ class Operations:
         cur.execute("CREATE TABLE %s_ways (id INTEGER PRIMARY KEY, tags TEXT)" % options.prefix)
         cur.execute("CREATE TABLE %s_coords (id INTEGER PRIMARY KEY, lat REAL, lng REAL)" % options.prefix)
         cur.execute("CREATE TABLE %s_ways_coords (id_way INTEGER, id_node INTEGER)" % options.prefix)
-        cur.execute("CREATE TABLE %s_relations (id INTEGER PRIMARY KEY, tags TEXT)" % options.prefix)
+        cur.execute("CREATE TABLE %s_relations (id INTEGER PRIMARY KEY, type TEXT, tags TEXT)" % options.prefix)
         cur.execute("CREATE TABLE %s_relations_refs (id_relation INTEGER, id_elt INTEGER, type_elt TEXT, role TEXT)" % options.prefix)
         self.connection.commit()
         
         self.style = DBStyle(options.style)
-        self.tableFields = []
         
         
     def ways(self, ways):
@@ -74,8 +73,8 @@ class Operations:
     def relations(self, rels):
         cur = self.connection.cursor()
         for id, tags, refs in rels:
-            cur.execute("INSERT INTO %s_relations VALUES (?, ?)" % self.options.prefix, 
-                (id, json.dumps(tags, ensure_ascii=False)))
+            cur.execute("INSERT INTO %s_relations VALUES (?, ?, ?)" % self.options.prefix, 
+                (id, tags.get('type'), json.dumps(tags, ensure_ascii=False)))
             rel_elts = []
             for n in refs:
                 rel_elts.append((id,) + n)
@@ -164,7 +163,6 @@ class Operations:
         cur = self.connection.cursor()
         for (tag, s) in self.style:
             if self.style.is_field(tag):
-                self.tableFields.append(tag)
                 for table in ('_line', '_point', '_polygon'):
                     cur.execute('ALTER TABLE %s%s ADD COLUMN "%s" %s' % (self.options.prefix, table, tag, s['dataType']))
         self.connection.commit()
@@ -193,7 +191,7 @@ class DBStyle:
         if styleFile:
             f = open(styleFile, 'r')
             for li in f:
-                li = li.split('#')[0].strip()
+                li = li.split('#', 1)[0].strip()
                 if li:
                     try:
                         elts = li.split()
