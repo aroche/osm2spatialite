@@ -103,15 +103,17 @@ class Operations:
         self.createTagColumns()
         
         # points
+        print "Points..."
         req = """SELECT nodes.id, tags, asBinary(makepoint(lng, lat)) geom 
             FROM {0}_nodes nodes JOIN {0}_coords coords ON nodes.id=coords.id""".format(self.options.prefix)
         self.insert_geoms(req, 'point')
         # lines, polygons
+        print "Ways..."
         req = """SELECT id, tags, asBinary(way) geom, asBinary(CastToMulti(BuildArea(way))) geom2, isClosed(way) isClosed
         FROM (SELECT ways.id, tags, makeline(makepoint(lng, lat)) way
             FROM {0}_ways ways JOIN {0}_ways_coords ON id_way=ways.id
             JOIN {0}_coords coords ON id_node=coords.id
-            GROUP BY id_way)""".format(self.options.prefix)
+            GROUP BY ways.id) WHERE st_isValid(way)""".format(self.options.prefix)
         self.insert_geoms(req, 'way')
         
         if not self.options.keepRaw:
@@ -174,7 +176,7 @@ class Operations:
         self.connection.commit()
 
     def createIndex(self):
-        print "Creating spatial indices..."
+        print "Creating spatial indexes..."
         cur = self.connection.cursor()
         for table in ('polygon', 'point', 'line'):
             cur.execute("SELECT CreateSpatialIndex('{}_{}', 'way')".format(self.options.prefix, table))
@@ -246,7 +248,7 @@ if os.path.exists(options.dbname):
     os.remove(options.dbname)
 print "Creating DB..."
 op = Operations(options)
-p = OSMParser(concurrency=2, ways_callback=op.ways, nodes_callback=op.nodes, 
+p = OSMParser(concurrency=4, ways_callback=op.ways, nodes_callback=op.nodes, 
           relations_callback=op.relations, coords_callback=op.coords)
 print "Parsing data..."
 p.parse(options.inputFile)
