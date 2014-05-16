@@ -67,11 +67,14 @@ class Operations:
     def osm2tables(self):
         """Creates true geom tables and populates them"""
         cur = self.connection.cursor()
-        cur.execute("CREATE TABLE %s_line (osm_id INTEGER, tags TEXT)" % self.options.prefix, )
+        tagFields = ''
+        if self.options.json:
+            tagField = ', tags TEXT'
+        cur.execute("CREATE TABLE {}_line (osm_id INTEGER {})".format(self.options.prefix, tagField))
         cur.execute("SELECT AddGeometryColumn('%s_line', 'way', 4326, 'LINESTRING')" % self.options.prefix)
-        cur.execute("CREATE TABLE osm_polygon (%s_id INTEGER, tags TEXT)" % self.options.prefix)
+        cur.execute("CREATE TABLE {}_polygon (osm_id INTEGER {})".format(self.options.prefix, tagField))
         cur.execute("SELECT AddGeometryColumn('%s_polygon', 'way', 4326, 'MULTIPOLYGON')" % self.options.prefix)
-        cur.execute("CREATE TABLE osm_point (%s_id INTEGER, tags TEXT)" % self.options.prefix)
+        cur.execute("CREATE TABLE {}_point (osm_id INTEGER {})".format(self.options.prefix, tagField))
         cur.execute("SELECT AddGeometryColumn('%s_point', 'way', 4326, 'POINT')" % self.options.prefix)
         self.connection.commit()
         self.createTagColumns()
@@ -110,19 +113,23 @@ class Operations:
                 geom = li['geom']   
             
             vals = [li['id'], geom]
-            tags2 = tags.copy()
+            if self.options.json:
+                tags2 = tags.copy()
             for (tag, val) in tags.iteritems():
                 if self.style.is_field(tag):
                     fields.append('"' + tag + '"')
                     vals.append(val)
-                elif self.style.has_tag(tag) and self.style.get(tag)['flag'] == 'delete':
+                elif self.options.json and self.style.has_tag(tag) and self.style.get(tag)['flag'] == 'delete':
                     del tags2[tag]
-            vals.append(json.dumps(tags2))
-            fields.append('tags')
+            
+            nbtags = len(fields) - 2
+            if self.options.json:
+                vals.append(json.dumps(tags2))
+                fields.append('tags')
 
             req = """INSERT INTO %s (%s)
                                VALUES (%s) """ % (table, ','.join(fields),
-               ','.join(['?', 'setSRID(geomFromWKB(?), 4326)', '?'] + (['?'] * (len(fields)-3))))
+               ','.join(['?', 'setSRID(geomFromWKB(?), 4326)'] + (['?'] * nbfields)))
             cur_insert.execute(req, vals)
         self.connection.commit()
         
@@ -142,6 +149,13 @@ class Operations:
         cur = self.connection.cursor()
         for table in ('coords', 'ways', 'nodes', 'ways_coords', 'relations', 'relations_refs'):
             cur.execute('DROP TABLE {}_{}'.format(self.options.prefix, table))
+        self.connection.commit()
+
+    def createIndex(self):
+        print "Creating spatial indices..."
+        cur = self.connection.cursor()
+        for table in ('polygon', 'point', 'line'):
+            cur.execute("SELECT CreateSpatialIndex('{}_{}', 'way')".format(self.options.prefix, table))
         self.connection.commit()
                                 
             
@@ -216,3 +230,5 @@ op.osm2tables()
 
 ## TODO
 ## - warning before deleting existing db (with option for that)
+## - custom SRID
+## -implement relations (multipolygons...)
