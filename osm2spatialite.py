@@ -146,13 +146,16 @@ class Operations:
                     vals.append(val)
                 elif self.options.json and self.style.has_tag(tag) and self.style.get(tag)['flag'] == 'delete':
                     del tags2[tag]
+                    
+            # if no tags left, objet is not created
+            if len(fields) <= 2 and not self.options.keepAll:
+                continue
             
             if self.options.json:
-                if len(tags2) > 0:
-                    vals.append(json.dumps(tags2, ensure_ascii=False))
-                else:
-                    vals.append(None)
+                tags = tags2
+                vals.append(json.dumps(tags, ensure_ascii=False))
                 fields.append('tags')
+                
             nbtags = len(fields) - 2
 
             req = """INSERT INTO %s (%s)
@@ -244,6 +247,8 @@ argParser.add_argument("-k", "--keep-raw", help="Keep intermediary tables, match
 argParser.add_argument("-i", "--index", help="Create spatial index for geometry columns",
                        action='store_true')
 argParser.add_argument("-s", "--style", help="use specified style file", default='default.style')
+argParser.add_argument("-a", "--keep-all", dest='keepAll', help="Do not filter out objects that have not tags in style file",
+                       action='store_true')
 options = argParser.parse_args()
         
                            
@@ -262,3 +267,4 @@ op.osm2tables()
 ## - warning before deleting existing db (with option for that)
 ## - custom SRID
 ## -implement relations (multipolygons...)
+## - possible multie flags
