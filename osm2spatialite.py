@@ -147,10 +147,13 @@ class Operations:
                 elif self.options.json and self.style.has_tag(tag) and self.style.get(tag)['flag'] == 'delete':
                     del tags2[tag]
             
-            nbtags = len(fields) - 2
             if self.options.json:
-                vals.append(json.dumps(tags2))
+                if len(tags2) > 0:
+                    vals.append(json.dumps(tags2, ensure_ascii=False))
+                else:
+                    vals.append(None)
                 fields.append('tags')
+            nbtags = len(fields) - 2
 
             req = """INSERT INTO %s (%s)
                                VALUES (%s) """ % (table, ','.join(fields),
