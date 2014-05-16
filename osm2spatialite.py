@@ -39,7 +39,7 @@ class Operations:
         self.connection = db.connect(options.dbname)
         self.connection.row_factory = db.Row
         cur = self.connection.cursor()
-        cur.execute("SELECT InitSpatialMetadata(1)")
+        cur.execute("SELECT InitSpatialMetadata('TRUE')")
         cur.execute("CREATE TABLE %s_nodes (id INTEGER PRIMARY KEY, tags TEXT)" % options.prefix)
         cur.execute("CREATE TABLE %s_ways (id INTEGER PRIMARY KEY, tags TEXT)" % options.prefix)
         cur.execute("CREATE TABLE %s_coords (id INTEGER PRIMARY KEY, lat REAL, lng REAL)" % options.prefix)
@@ -91,15 +91,15 @@ class Operations:
     def osm2tables(self):
         """Creates true geom tables and populates them"""
         cur = self.connection.cursor()
-        tagFields = ''
+        tagField = ''
         if self.options.json:
             tagField = ', tags TEXT'
         cur.execute("CREATE TABLE {}_line (osm_id INTEGER {})".format(self.options.prefix, tagField))
-        cur.execute("SELECT AddGeometryColumn('%s_line', 'way', 4326, 'LINESTRING')" % self.options.prefix)
+        cur.execute("SELECT AddGeometryColumn('%s_line', 'way', 4326, 'LINESTRING', 'XY')" % self.options.prefix)
         cur.execute("CREATE TABLE {}_polygon (osm_id INTEGER {})".format(self.options.prefix, tagField))
-        cur.execute("SELECT AddGeometryColumn('%s_polygon', 'way', 4326, 'MULTIPOLYGON')" % self.options.prefix)
+        cur.execute("SELECT AddGeometryColumn('%s_polygon', 'way', 4326, 'MULTIPOLYGON', 'XY')" % self.options.prefix)
         cur.execute("CREATE TABLE {}_point (osm_id INTEGER {})".format(self.options.prefix, tagField))
-        cur.execute("SELECT AddGeometryColumn('%s_point', 'way', 4326, 'POINT')" % self.options.prefix)
+        cur.execute("SELECT AddGeometryColumn('%s_point', 'way', 4326, 'POINT', 'XY')" % self.options.prefix)
         self.connection.commit()
         self.createTagColumns()
         
@@ -153,7 +153,7 @@ class Operations:
 
             req = """INSERT INTO %s (%s)
                                VALUES (%s) """ % (table, ','.join(fields),
-               ','.join(['?', 'setSRID(geomFromWKB(?), 4326)'] + (['?'] * nbfields)))
+               ','.join(['?', 'setSRID(geomFromWKB(?), 4326)'] + (['?'] * nbtags)))
             cur_insert.execute(req, vals)
         self.connection.commit()
         
@@ -196,7 +196,10 @@ class DBStyle:
                 li = li.split('#')[0].strip()
                 if li:
                     try:
-                        osmTypes, tag, dataType, flag = li.split()
+                        elts = li.split()
+                        if len(elts) == 3:
+                            elts.append(None)
+                        osmTypes, tag, dataType, flag = elts
                     except:
                         print "Error parsing %s" % li
                         continue
@@ -248,7 +251,7 @@ op = Operations(options)
 p = OSMParser(concurrency=2, ways_callback=op.ways, nodes_callback=op.nodes, 
           relations_callback=op.relations, coords_callback=op.coords)
 print "Parsing data..."
-p.parse('data.osm')
+p.parse(options.inputFile)
 print "Creating geometries..."
 op.osm2tables()
 
