@@ -158,8 +158,8 @@ class Operations:
                 
             nbtags = len(fields) - 2
 
-            req = """INSERT INTO %s (%s)
-                               VALUES (%s) """ % (table, ','.join(fields),
+            req = """INSERT INTO {} ({})
+                               VALUES ({}) """.format(table, ','.join(fields),
                ','.join(['?', 'setSRID(geomFromWKB(?), 4326)'] + (['?'] * nbtags)))
             cur_insert.execute(req, vals)
         self.connection.commit()
@@ -172,7 +172,7 @@ class Operations:
         for (tag, s) in self.style:
             if self.style.is_field(tag):
                 for table in ('_line', '_point', '_polygon'):
-                    cur.execute('ALTER TABLE %s%s ADD COLUMN "%s" %s' % (self.options.prefix, table, tag, s['dataType']))
+                    cur.execute('ALTER TABLE {}{} ADD COLUMN "{}" {}'.formate(self.options.prefix, table, tag, s['dataType']))
         self.connection.commit()
 
     def deleteTempTables(self):
