@@ -1,7 +1,6 @@
 ## The MIT License (MIT)
 
-## Copyright (c) <year> <copyright holders>
-
+## Copyright (c) 2014 Augustin Roche
 ## Permission is hereby granted, free of charge, to any person obtaining a copy
 ## of this software and associated documentation files (the "Software"), to deal
 ## in the Software without restriction, including without limitation the rights
@@ -249,6 +248,7 @@ argParser.add_argument("-i", "--index", help="Create spatial index for geometry 
 argParser.add_argument("-s", "--style", help="use specified style file", default='default.style')
 argParser.add_argument("-a", "--keep-all", dest='keepAll', help="Do not filter out objects that have not tags in style file",
                        action='store_true')
+argParser.add_argument("--parse-processors", dest='parseProc', help="Number of processors to use for parsing data default: 4)", default=4)
 options = argParser.parse_args()
         
                            
@@ -256,7 +256,7 @@ if os.path.exists(options.dbname):
     os.remove(options.dbname)
 print "Creating DB..."
 op = Operations(options)
-p = OSMParser(concurrency=4, ways_callback=op.ways, nodes_callback=op.nodes, 
+p = OSMParser(concurrency=options.parseProc, ways_callback=op.ways, nodes_callback=op.nodes, 
           relations_callback=op.relations, coords_callback=op.coords)
 print "Parsing data..."
 p.parse(options.inputFile)
