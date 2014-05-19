@@ -25,7 +25,7 @@
 # uses a style file like osm2pgsql
 
 
-import os, sys
+import os, sys, re
 import pyspatialite.dbapi2 as db
 from imposm.parser import OSMParser
 import argparse
@@ -171,7 +171,7 @@ class Operations:
         for (tag, s) in self.style:
             if self.style.is_field(tag):
                 for table in ('_line', '_point', '_polygon'):
-                    cur.execute('ALTER TABLE {}{} ADD COLUMN "{}" {}'.formate(self.options.prefix, table, tag, s['dataType']))
+                    cur.execute('ALTER TABLE {}{} ADD COLUMN "{}" {}'.format(self.options.prefix, table, tag, s['dataType']))
         self.connection.commit()
 
     def deleteTempTables(self):
@@ -195,6 +195,7 @@ class DBStyle:
     def __init__(self, styleFile):
         self.styleFile=styleFile
         self.tags = {}
+        self.patternedKeys = []
         if styleFile:
             f = open(styleFile, 'r')
             for li in f:
@@ -213,24 +214,30 @@ class DBStyle:
                                       'dataType': dataType,
                                       'flag': flag
                                       }
+                    if '*' in tag:
+                        regexp = re.compile(tag.replace('*', '[a-zA-z0-9\:_]*'))
+                        self.patternedKeys.append((tag, regexp))
               
     def __iter__(self):
         for (k, tag) in self.tags.iteritems():
             yield (k, tag)
             
     def get(self, tagname):
-        return self.tags.get(tagname)
+        if tagname in self.tags:
+            return self.tags[tagname]
+        for ptag, exp in self.patternedKeys:
+            if exp.match(tagname):
+                return self.tags[ptag]
         
-    def has_tag(self, tagname):
-        return (tagname in self.tags)
-    
     def is_field(self, tagname):
-        return ((tagname in self.tags) and (self.tags[tagname]['flag'] not in ('phstore', 'delete')))
+        res = self.get(tagname)
+        return ((res is not None) and (res['flag'] not in ('phstore', 'delete')))
     
     def is_polygon(self, tags):
         """Checks if any of the given tags if flagged as polygon"""
         for tagname in tags:
-            if tagname in self.tags and self.tags[tagname]['flag'] in ('polygon', 'phstore'):
+            res = self.get(tagname)
+            if (res is not None) and res['flag'] in ('polygon', 'phstore'):
                 return True
 
 
