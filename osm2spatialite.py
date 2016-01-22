@@ -1,6 +1,6 @@
 ## The MIT License (MIT)
 
-## Copyright (c) <year> <copyright holders>
+## Copyright (c) 2016 Augustin Roche
 
 ## Permission is hereby granted, free of charge, to any person obtaining a copy
 ## of this software and associated documentation files (the "Software"), to deal
@@ -53,38 +53,37 @@ class Operations:
         
         self.style = DBStyle(options.style)
         
-        
     def ways(self, ways):
         cur = self.connection.cursor()
         for id, tags, refs in ways:
-            cur.execute("INSERT INTO %s_ways VALUES (?, ?)" % self.options.prefix, (id, json.dumps(tags, ensure_ascii=False)))
+            cur.execute("INSERT INTO \"%s_ways\" VALUES (?, ?)" % self.options.prefix, (id, json.dumps(tags, ensure_ascii=False)))
             way_coords = [(id, n) for n in refs]
-            cur.executemany("INSERT INTO %s_ways_coords VALUES (?, ?)"  % self.options.prefix, way_coords)
+            cur.executemany("INSERT INTO \"%s_ways_coords\" VALUES (?, ?)"  % self.options.prefix, way_coords)
             
         self.connection.commit()
         
     def nodes(self, nodes):
         cur = self.connection.cursor()
         for id, tags, coords in nodes:
-            cur.execute("INSERT INTO %s_nodes VALUES (?, ?)"  % self.options.prefix, 
+            cur.execute("INSERT INTO \"%s_nodes\" VALUES (?, ?)"  % self.options.prefix, 
                 (id, json.dumps(tags, ensure_ascii=False)))
         self.connection.commit()
         
     def relations(self, rels):
         cur = self.connection.cursor()
         for id, tags, refs in rels:
-            cur.execute("INSERT INTO %s_relations VALUES (?, ?, ?)" % self.options.prefix, 
+            cur.execute("INSERT INTO \"%s_relations\" VALUES (?, ?, ?)" % self.options.prefix, 
                 (id, tags.get('type'), json.dumps(tags, ensure_ascii=False)))
             rel_elts = []
             for n in refs:
                 rel_elts.append((id,) + n)
-            cur.executemany("INSERT INTO %s_relations_refs VALUES (?, ?, ?, ?)" % self.options.prefix, rel_elts)
+            cur.executemany("INSERT INTO \"%s_relations_refs\" VALUES (?, ?, ?, ?)" % self.options.prefix, rel_elts)
         self.connection.commit()
         
     def coords(self, coords):
         cur = self.connection.cursor()
         for id, x, y in coords:
-            cur.execute("INSERT INTO %s_coords VALUES (?, ?, ?)" % self.options.prefix, (id, y, x))
+            cur.execute("INSERT INTO \"%s_coords\" VALUES (?, ?, ?)" % self.options.prefix, (id, y, x))
         self.connection.commit()
         
     def osm2tables(self):
@@ -93,11 +92,11 @@ class Operations:
         tagField = ''
         if self.options.json:
             tagField = ', tags TEXT'
-        cur.execute("CREATE TABLE {}_line (osm_id INTEGER {})".format(self.options.prefix, tagField))
+        cur.execute("CREATE TABLE \"{}_line\" (osm_id INTEGER {})".format(self.options.prefix, tagField))
         cur.execute("SELECT AddGeometryColumn('%s_line', 'way', 4326, 'LINESTRING', 'XY')" % self.options.prefix)
-        cur.execute("CREATE TABLE {}_polygon (osm_id INTEGER {})".format(self.options.prefix, tagField))
+        cur.execute("CREATE TABLE \"{}_polygon\" (osm_id INTEGER {})".format(self.options.prefix, tagField))
         cur.execute("SELECT AddGeometryColumn('%s_polygon', 'way', 4326, 'MULTIPOLYGON', 'XY')" % self.options.prefix)
-        cur.execute("CREATE TABLE {}_point (osm_id INTEGER {})".format(self.options.prefix, tagField))
+        cur.execute("CREATE TABLE \"{}_point\" (osm_id INTEGER {})".format(self.options.prefix, tagField))
         cur.execute("SELECT AddGeometryColumn('%s_point', 'way', 4326, 'POINT', 'XY')" % self.options.prefix)
         self.connection.commit()
         self.createTagColumns()
@@ -105,14 +104,14 @@ class Operations:
         # points
         print("Points...")
         req = """SELECT nodes.id, tags, asBinary(makepoint(lng, lat)) geom 
-            FROM {0}_nodes nodes JOIN {0}_coords coords ON nodes.id=coords.id""".format(self.options.prefix)
+            FROM \"{0}_nodes\" nodes JOIN {0}_coords coords ON nodes.id=coords.id""".format(self.options.prefix)
         self.insert_geoms(req, 'point')
         # lines, polygons
         print("Ways...")
         req = """SELECT id, tags, asBinary(way) geom, asBinary(CastToMulti(BuildArea(way))) geom2, isClosed(way) isClosed
         FROM (SELECT ways.id, tags, makeline(makepoint(lng, lat)) way
-            FROM {0}_ways ways JOIN {0}_ways_coords ON id_way=ways.id
-            JOIN {0}_coords coords ON id_node=coords.id
+            FROM \"{0}_ways\" ways JOIN \"{0}_ways_coords\" ON id_way=ways.id
+            JOIN \"{0}_coords\" coords ON id_node=coords.id
             GROUP BY ways.id) WHERE st_isValid(way)""".format(self.options.prefix)
         self.insert_geoms(req, 'way')
         
@@ -158,7 +157,7 @@ class Operations:
                 
             nbtags = len(fields) - 2
 
-            req = """INSERT INTO {} ({})
+            req = """INSERT INTO "{}" ({})
                                VALUES ({}) """.format(table, ','.join(fields),
                ','.join(['?', 'setSRID(geomFromWKB(?), 4326)'] + (['?'] * nbtags)))
             cur_insert.execute(req, vals)
@@ -172,7 +171,7 @@ class Operations:
         for (tag, s) in self.style:
             if self.style.is_field(tag):
                 for table in ('_line', '_point', '_polygon'):
-                    cur.execute('ALTER TABLE {}{} ADD COLUMN "{}" {}'.format(self.options.prefix, table, tag, s['dataType']))
+                    cur.execute('ALTER TABLE "{}{}" ADD COLUMN "{}" {}'.format(self.options.prefix, table, tag, s['dataType']))
         self.connection.commit()
 
     def deleteTempTables(self):
