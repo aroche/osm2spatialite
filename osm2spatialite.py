@@ -30,7 +30,6 @@ import os, sys
 import pyspatialite.dbapi2 as db
 import argparse
 import json
-import pdb
 try:
     from imposm.parser import OSMParser
 except:
@@ -59,13 +58,8 @@ class Operations:
         cur = self.connection.cursor()
         for id, tags, refs in ways:
             cur.execute("INSERT INTO %s_ways VALUES (?, ?)" % self.options.prefix, (id, json.dumps(tags, ensure_ascii=False)))
-            way_coords = []
-            for n in refs:
-                way_coords.append((id, n))
-            try:
-                cur.executemany("INSERT INTO %s_ways_coords VALUES (?, ?)"  % self.options.prefix, way_coords)
-            except:
-                pdb.set_trace()
+            way_coords = [(id, n) for n in refs]
+            cur.executemany("INSERT INTO %s_ways_coords VALUES (?, ?)"  % self.options.prefix, way_coords)
             
         self.connection.commit()
         
@@ -153,7 +147,7 @@ class Operations:
                 elif self.options.json and self.style.has_tag(tag) and self.style.get(tag)['flag'] == 'delete':
                     del tags2[tag]
                     
-            # if no tags left, objet is not created
+            # if no tags left, object is not created
             if len(fields) <= 2 and not self.options.keepAll:
                 continue
             
@@ -203,23 +197,23 @@ class DBStyle:
         self.styleFile=styleFile
         self.tags = {}
         if styleFile:
-            f = open(styleFile, 'r')
-            for li in f:
-                li = li.split('#', 1)[0].strip()
-                if li:
-                    try:
-                        elts = li.split()
-                        if len(elts) == 3:
-                            elts.append(None)
-                        osmTypes, tag, dataType, flag = elts
-                    except:
-                        print("Error parsing %s" % li)
-                        continue
-                    self.tags[tag] = {
-                                      'osmTypes': osmTypes.split(','), 
-                                      'dataType': dataType,
-                                      'flag': flag
-                                      }
+            with open(styleFile, 'r') as f:
+                for li in f:
+                    li = li.split('#', 1)[0].strip()
+                    if li:
+                        try:
+                            elts = li.split()
+                            if len(elts) == 3:
+                                elts.append(None)
+                            osmTypes, tag, dataType, flag = elts
+                        except:
+                            print("Error parsing %s" % li)
+                            continue
+                        self.tags[tag] = {
+                                        'osmTypes': osmTypes.split(','), 
+                                        'dataType': dataType,
+                                        'flag': flag
+                                        }
               
     def __iter__(self):
         for (k, tag) in self.tags.iteritems():
