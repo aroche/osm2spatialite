@@ -179,6 +179,7 @@ class Operations:
         for table in ('coords', 'ways', 'nodes', 'ways_coords', 'relations', 'relations_refs'):
             cur.execute('DROP TABLE {}_{}'.format(self.options.prefix, table))
         self.connection.commit()
+        cur.execute('VACUUM')
 
     def createIndex(self):
         print("Creating spatial indexes...")
