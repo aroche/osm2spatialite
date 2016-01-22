@@ -28,10 +28,14 @@
 
 import os, sys
 import pyspatialite.dbapi2 as db
-from imposm.parser import OSMParser
 import argparse
 import json
 import pdb
+try:
+    from imposm.parser import OSMParser
+except:
+    from OSMParser import OSMParser
+    
 
 class Operations:
     def __init__(self, options):
@@ -39,13 +43,13 @@ class Operations:
         self.connection = db.connect(options.dbname)
         self.connection.row_factory = db.Row
         cur = self.connection.cursor()
-        cur.execute("SELECT InitSpatialMetadata('TRUE')")
-        cur.execute("CREATE TABLE %s_nodes (id INTEGER PRIMARY KEY, tags TEXT)" % options.prefix)
-        cur.execute("CREATE TABLE %s_ways (id INTEGER PRIMARY KEY, tags TEXT)" % options.prefix)
-        cur.execute("CREATE TABLE %s_coords (id INTEGER PRIMARY KEY, lat REAL, lng REAL)" % options.prefix)
-        cur.execute("CREATE TABLE %s_ways_coords (id_way INTEGER, id_node INTEGER)" % options.prefix)
-        cur.execute("CREATE TABLE %s_relations (id INTEGER PRIMARY KEY, type TEXT, tags TEXT)" % options.prefix)
-        cur.execute("CREATE TABLE %s_relations_refs (id_relation INTEGER, id_elt INTEGER, type_elt TEXT, role TEXT)" % options.prefix)
+        cur.execute("SELECT InitSpatialMetadata(1)")
+        cur.execute("CREATE TABLE \"%s_nodes\" (id INTEGER PRIMARY KEY, tags TEXT)" % options.prefix)
+        cur.execute("CREATE TABLE \"%s_ways\" (id INTEGER PRIMARY KEY, tags TEXT)" % options.prefix)
+        cur.execute("CREATE TABLE \"%s_coords\" (id INTEGER PRIMARY KEY, lat REAL, lng REAL)" % options.prefix)
+        cur.execute("CREATE TABLE \"%s_ways_coords\" (id_way INTEGER, id_node INTEGER)" % options.prefix)
+        cur.execute("CREATE TABLE \"%s_relations\" (id INTEGER PRIMARY KEY, type TEXT, tags TEXT)" % options.prefix)
+        cur.execute("CREATE TABLE \"%s_relations_refs\" (id_relation INTEGER, id_elt INTEGER, type_elt TEXT, role TEXT)" % options.prefix)
         self.connection.commit()
         
         self.style = DBStyle(options.style)
@@ -58,13 +62,15 @@ class Operations:
             way_coords = []
             for n in refs:
                 way_coords.append((id, n))
-            cur.executemany("INSERT INTO %s_ways_coords VALUES (?, ?)"  % self.options.prefix, way_coords)
+            try:
+                cur.executemany("INSERT INTO %s_ways_coords VALUES (?, ?)"  % self.options.prefix, way_coords)
+            except:
+                pdb.set_trace()
             
         self.connection.commit()
         
     def nodes(self, nodes):
         cur = self.connection.cursor()
-        # pdb.set_trace()
         for id, tags, coords in nodes:
             cur.execute("INSERT INTO %s_nodes VALUES (?, ?)"  % self.options.prefix, 
                 (id, json.dumps(tags, ensure_ascii=False)))
@@ -103,12 +109,12 @@ class Operations:
         self.createTagColumns()
         
         # points
-        print "Points..."
+        print("Points...")
         req = """SELECT nodes.id, tags, asBinary(makepoint(lng, lat)) geom 
             FROM {0}_nodes nodes JOIN {0}_coords coords ON nodes.id=coords.id""".format(self.options.prefix)
         self.insert_geoms(req, 'point')
         # lines, polygons
-        print "Ways..."
+        print("Ways...")
         req = """SELECT id, tags, asBinary(way) geom, asBinary(CastToMulti(BuildArea(way))) geom2, isClosed(way) isClosed
         FROM (SELECT ways.id, tags, makeline(makepoint(lng, lat)) way
             FROM {0}_ways ways JOIN {0}_ways_coords ON id_way=ways.id
@@ -172,7 +178,7 @@ class Operations:
         for (tag, s) in self.style:
             if self.style.is_field(tag):
                 for table in ('_line', '_point', '_polygon'):
-                    cur.execute('ALTER TABLE {}{} ADD COLUMN "{}" {}'.formate(self.options.prefix, table, tag, s['dataType']))
+                    cur.execute('ALTER TABLE {}{} ADD COLUMN "{}" {}'.format(self.options.prefix, table, tag, s['dataType']))
         self.connection.commit()
 
     def deleteTempTables(self):
@@ -182,7 +188,7 @@ class Operations:
         self.connection.commit()
 
     def createIndex(self):
-        print "Creating spatial indexes..."
+        print("Creating spatial indexes...")
         cur = self.connection.cursor()
         for table in ('polygon', 'point', 'line'):
             cur.execute("SELECT CreateSpatialIndex('{}_{}', 'way')".format(self.options.prefix, table))
@@ -207,7 +213,7 @@ class DBStyle:
                             elts.append(None)
                         osmTypes, tag, dataType, flag = elts
                     except:
-                        print "Error parsing %s" % li
+                        print("Error parsing %s" % li)
                         continue
                     self.tags[tag] = {
                                       'osmTypes': osmTypes.split(','), 
@@ -254,13 +260,13 @@ options = argParser.parse_args()
                            
 if os.path.exists(options.dbname):
     os.remove(options.dbname)
-print "Creating DB..."
+print("Creating DB...")
 op = Operations(options)
 p = OSMParser(concurrency=4, ways_callback=op.ways, nodes_callback=op.nodes, 
           relations_callback=op.relations, coords_callback=op.coords)
-print "Parsing data..."
+print("Parsing data...")
 p.parse(options.inputFile)
-print "Creating geometries..."
+print("Creating geometries...")
 op.osm2tables()
 
 ## TODO
