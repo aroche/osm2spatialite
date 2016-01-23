@@ -48,8 +48,7 @@ class OSMParser:
                     tags = self.extract_tags(elt)
                     if len(tags) > 0:
                         nodes.append((elt.get('id'), tags, (elt.get('lon'), elt.get('lat'))))
-                    else:
-                        coords.append((elt.get('id'), elt.get('lon'), elt.get('lat')))
+                    coords.append((elt.get('id'), elt.get('lon'), elt.get('lat')))
                 if elt.tag == 'way':
                     refs = [nd.get('ref') for nd in elt.findall('nd')]
                     tags = self.extract_tags(elt)
